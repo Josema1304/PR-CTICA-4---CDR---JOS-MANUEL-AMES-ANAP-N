@@ -1,0 +1,89 @@
+# PRÁCTICA 4---CDR---JOSÉ-MANUEL-AMES-ANAPÁN
+Comunicación de datos y redes
+
+aws elb create-load-balancer --load-balancer-name josema --listeners "Protocol=HTTP,LoadBalancerPort=80,InstanceProtocol=HTTP,InstancePort=80" --availability-zones us-east-1a
+
+
+
+aws elb describe-load-balancers --load-balancer-name josema
+
+
+aws ec2 run-instances --image-id ami-d9a98cb0 --count 2 --instance-type t1.micro --key-name josema-key --security-groups josema --user-data file://./apache-install --placement AvailabilityZone=us-east-1a
+
+
+aws elb register-instances-with-load-balancer --load-balancer-name josema --instances i-0bd2d84b730410a37 i-0a57703b866a215ad
+
+
+aws elb describe-instance-health --load-balancer-name josema
+
+http://josema-865795609.us-east-1.elb.amazonaws.com/
+
+<html><body><h1>¡Funciona!</h1>
+
+<p>La solicitud se envió a la instancia 1.</p>
+
+<p>La solicitud fue atendida por el servidor web 1.</p>
+
+</body></html>
+
+aws ec2 monitor-instances --instance-ids i-0bd2d84b730410a37 i-0a57703b866a215ad
+
+aws cloudwatch list-metrics --namespaces "AWS/EC2"
+
+Para la instancia "i-0bd2d84b730410a37":
+
+aws cloudwatch get-metric-statistics \ --metric-name CPUUtilization \ --start-time "2023-06-19T18:21:00Z" \ --end-time "2023-06-19T18:23:32Z" \ --period 3600 \ --namespace AWS/EC2 \ --statistics Maximum \ --dimensions Name=InstanceId,Value=i-0bd2d84b730410a37
+
+Para la instancia "i-0a57703b866a215ad":
+
+aws cloudwatch get-metric-statistics \ --metric-name CPUUtilization \ --start-time "2023-06-19T18:21:00Z" \ --end-time "2023-06-19T18:23:32Z" \ --period 3600 \ --namespace AWS/EC2 \ --statistics Maximum \ --dimensions Name=InstanceId,Value=i-047a269dcbb7c23d8
+
+ab -n 50 -c 5 http://josema-865795609.us-east-1.elb.amazonaws.com/
+
+aws cloudwatch get-metric-statistics \ --metric-name Latency \ --start-time "$(date -u -d '1 hour ago' +'%Y-%m-%dT%H:%M:%SZ')" \ --end-time "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \ --period 300 \ --namespace AWS/ELB \ --statistics Average \ --dimensions Name=LoadBalancerName,Value=josema
+
+aws cloudwatch get-metric-statistics \ --metric-name RequestCount \ --start-time "$(date -u -d '1 hour ago' +'%Y-%m-%dT%H:%M:%SZ')" \ --end-time "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \ --period 300 \ --namespace AWS/ELB \ --statistics Sum \ --dimensions Name=LoadBalancerName,Value=josema
+
+aws elb deregister-instances-from-load-balancer \ --load-balancer-name sophia \ --instances i-0bd2d84b730410a37 i-0a57703b866a215ad
+
+aws elb delete-load-balancer --load-balancer-name josema
+
+aws ec2 terminate-instances --instance-ids i-0bd2d84b730410a37 i-0a57703b866a215ad
+
+aws autoscaling create-launch-configuration \ --launch-configuration-name josema-lc \ --image-id ami-d9a98cb0 \ --instance-type t1.micro \ --key-name josema-key \ --security-groups josema \ --user-data file://./apache-install
+
+aws autoscaling describe-launch-configurations --launch-configuration-names josema-lc
+
+aws elb create-load-balancer --load-balancer-name josema --listeners "Protocol=HTTP,LoadBalancerPort=80,InstanceProtocol=HTTP,InstancePort=80" --availability-zones us-east-1c
+
+aws autoscaling create-auto-scaling-group --auto-scaling-group-name josema-asg --launch-configuration-name josema-lc --min-size 1 --max-size 3 --load-balancer-names josema --availability-zones us-east-1c
+
+aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names josema-asg
+
+aws autoscaling put-scaling-policy --auto-scaling-group-name josema-asg --policy-name josema-scaleup --scaling-adjustment 1 --adjustment-type ChangeInCapacity --cooldown 120
+
+aws cloudwatch put-metric-alarm --alarm-name josema-highcpualarm --metric-name CPUUtilization --namespace AWS/EC2 --statistic Average --period 120 --threshold 70 --comparison-operator GreaterThanThreshold --dimensions "Name=AutoScalingGroupName,Value=josema-asg" --evaluation-periods 1 --alarm-actions arn:aws:autoscaling:us-east-1:8158180281
+
+ssh -i devenv-key.pem ubuntu@33.172.743.40
+
+apt-get install stress
+
+stress--cpu 1
+
+aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name josema-asg
+
+aws autoscaling put-scaling-policy --auto-scaling-group-name josema-asg --policy-name josema-scaledown --scaling-adjustment -1 --adjustment-type ChangeInCapacity --cooldown 120
+
+aws cloudwatch put-metric-alarm --alarm-name josema-lowcpualarm --metric-name CPUUtilization --namespace AWS/EC2 --statistic Average --period 120 --threshold 30 --comparison-operator LessThanThreshold --dimensions "Name=AutoScalingGroupName,Value=josema-asg" --evaluation-periods 1 --alarm-actions
+
+aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name josema-asg
+
+aws autoscaling delete-auto-scaling-group --auto-scaling-group-name josema-asg --force-delete
+
+
+aws cloudwatch delete-alarms --alarm-name josema-lowcpualarm
+aws cloudwatch delete-alarms --alarm-name josema-highcpualarm
+
+aws autoscaling delete-launch-configuration --launch-configuration-name josema-lc
+
+aws elbv2 delete-load-balancer --load-balancer-arn <ARN_del_ELBA>
