@@ -1,2 +1,2 @@
-# PR-CTICA-4---CDR---JOS-MANUEL-AMES-ANAP-N
+# PRÁCTICA 4---CDR---JOSÉ-MANUEL-AMES-ANAPÁN
 Comunicación de datos y redes
